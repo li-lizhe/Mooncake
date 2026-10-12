@@ -3,6 +3,10 @@ name: Pre-Release
 # Build the same core wheel matrix as the stable release workflows and attach
 # the artifacts to a GitHub Pre-release. Also publish the exact artifacts to
 # TestPyPI, then consume them in smoke and T-one tests. No production PyPI upload.
+# Corner the pre-release spellings PEP 440 normalizes to the same version:
+# a pre-release tag may be written as `v0.3.14-rc1` or as the canonical
+# `v0.3.14rc1`, and both must land on this path (see
+# scripts/ci/testpypi_wheel_gate.py classify-tag).
 on:
   push:
     tags:
@@ -10,6 +14,10 @@ on:
       - 'v*-alpha*'
       - 'v*-beta*'
       - 'v*-pre*'
+      - 'v*rc*'
+      - 'v*alpha*'
+      - 'v*beta*'
+      - 'v*pre*'
 
 jobs:
   version-stamp:

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Validate the core Mooncake pre-release wheel set on disk or TestPyPI."""
+"""Validate the core Mooncake release wheel set on disk or TestPyPI.
+
+Also classifies a release tag (``classify-tag``) so every release workflow can
+decide between the stable and the pre-release path with the same PEP 440 rules.
+"""
 
 from __future__ import annotations
 
@@ -72,6 +76,26 @@ def normalize_prerelease_tag(tag: str) -> Version:
     if not version.is_prerelease or version.local is not None:
         raise GateError(f"tag {tag!r} must identify a public PEP 440 pre-release")
     return version
+
+
+def classify_release_tag(tag: str) -> str:
+    """Classify a public release tag as ``stable`` or ``prerelease``.
+
+    A PEP 440 version has two spellings for the same pre-release: ``v0.3.14-rc1``
+    and ``v0.3.14rc1`` normalize identically, while a ``contains(..., "-")`` test
+    only recognizes the first. Classifying through ``packaging`` keeps every
+    release workflow consistent, and a tag that is not a valid PEP 440 version
+    fails loudly instead of silently skipping the release path.
+    """
+    if not tag.startswith("v"):
+        raise GateError(f"release tag must start with v: {tag!r}")
+    try:
+        version = Version(tag[1:])
+    except InvalidVersion as error:
+        raise GateError(f"invalid PEP 440 version in tag {tag!r}: {error}") from error
+    if version.local is not None:
+        raise GateError(f"tag {tag!r} must not carry a local version")
+    return "prerelease" if version.is_prerelease else "stable"
 
 
 def _target_from_wheel(filename: str, expected_version: Version) -> WheelTarget:
@@ -366,6 +390,14 @@ def _parser() -> argparse.ArgumentParser:
     normalize = subparsers.add_parser("normalize-version")
     normalize.add_argument("--tag", required=True)
 
+    classify = subparsers.add_parser("classify-tag")
+    classify.add_argument("--tag", required=True)
+    classify.add_argument(
+        "--expect",
+        choices=("stable", "prerelease"),
+        help="fail when the tag is not of this kind",
+    )
+
     upload = subparsers.add_parser("validate-upload-state")
     upload.add_argument("--directory", type=Path, required=True)
     upload.add_argument("--index-url", default=DEFAULT_INDEX_URL)
@@ -387,6 +419,14 @@ def main() -> int:
     try:
         if args.command == "normalize-version":
             print(normalize_prerelease_tag(args.tag))
+        elif args.command == "classify-tag":
+            kind = classify_release_tag(args.tag)
+            print(kind)
+            if args.expect is not None and kind != args.expect:
+                raise GateError(
+                    f"tag {args.tag!r} is a {kind} tag, "
+                    f"but a {args.expect} tag is required here"
+                )
         elif args.command == "validate-upload-state":
             validate_upload_state(
                 args.directory,

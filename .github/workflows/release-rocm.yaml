@@ -239,6 +239,19 @@ jobs:
       id-token: write
 
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Reject a pre-release tag on the stable release path
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet packaging
+          python3 scripts/ci/testpypi_wheel_gate.py classify-tag \
+            --tag "$RELEASE_TAG" --expect stable
+
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:

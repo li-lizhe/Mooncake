@@ -29,6 +29,16 @@ jobs:
           path: mooncake-wheel/dist-all
           pattern: ${{ inputs.artifact-pattern }}
 
+      - name: Reject a pre-release tag on the stable release path
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet packaging
+          python3 scripts/ci/testpypi_wheel_gate.py classify-tag \
+            --tag "$RELEASE_TAG" --expect stable
+
       - name: Prepare wheels for release
         run: |
           mkdir -p mooncake-wheel/dist-release

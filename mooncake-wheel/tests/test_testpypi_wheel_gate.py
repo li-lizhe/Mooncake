@@ -97,6 +97,20 @@ def test_prerelease_tag_normalization_rejects_non_public_versions() -> None:
             gate.normalize_prerelease_tag(tag)
 
 
+def test_release_tag_classification_covers_both_prerelease_spellings() -> None:
+    # PEP 440 normalizes `v1.2.0-rc1` and `v1.2.0rc1` to the same version, so a
+    # release workflow must not tell them apart by looking for a dash.
+    for tag in ("v1.2.0rc1", "v1.2.0-rc1", "v1.2.0b1", "v1.2.0-alpha1", "v1.2.0.dev1"):
+        assert gate.classify_release_tag(tag) == "prerelease"
+
+    for tag in ("v1.2.0", "v1.2.0.post1", "v0.3.13-1"):
+        assert gate.classify_release_tag(tag) == "stable"
+
+    for tag in ("1.2.0", "v1.2.0rc1+local", "vnot-a-version"):
+        with pytest.raises(gate.GateError):
+            gate.classify_release_tag(tag)
+
+
 def test_complete_matrix_requires_exact_version_and_all_24_targets() -> None:
     filenames = _complete_matrix("1.2.0rc1")
 
